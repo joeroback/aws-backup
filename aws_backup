@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+#
+# aws_backup.py
+#
+# Copyright 2016 Joe Roback <joe.roback@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import argparse
+import boto3
+import datetime
+import json
+import pprint
+import sys
+import uuid
+
+from subprocess import call
+
+# globals
+ec2 = boto3.resource('ec2')
+parser = argparse.ArgumentParser()
+pp = pprint.PrettyPrinter(indent=2, width=200)
+
+# EBS volume ids to operate on
+parser.add_argument('--volume-ids', required=True, nargs='+', dest='volume_ids', help='EBS Volume ID to snapshot')
+# mount points of associated volume (used to freeze filesystems)
+parser.add_argument('--mounts', nargs='*', default=[], dest='mounts', help='Mount points to freeze/unfreeze around snapshot creation')
+# how many snapshots to keep
+parser.add_argument('--keep', type=int, default=5, dest='keep', help='Number of snapshots to keep')
+# EC2 tags
+parser.add_argument('--tags', dest='tags', nargs='*', help='EC2 Tags to apply to snapshots in EC2')
+# database options
+parser.add_argument('--mysql', action="store_true", default=False, dest='mysql', help='Flush and Write Lock MySQL database')
+parser.add_argument('--mysql-credentials', default=None, dest='mysql_credentials', help='JSON file containing MySQL username and password')
+parser.add_argument('--mongo', action="store_true", default=False, dest='mongo', help='Flush and Write Lock MongoDB')
+parser.add_argument('--mongo-credentials', default=None, dest='mongo_credentials', help='JSON file containing MongoDB username and password')
+
+def make_aws_tag(tag):
+    nv = tag.split('=')
+    return { 'Key': nv[0], 'Value': nv[1] }
+
+def main(args):
+    tags = [ make_aws_tag(tag) for tag in args.tags ]
+    tags.append(make_aws_tag('Backup-UUID={}'.format(uuid.uuid4().hex)))
+
+    new_snapshots = []
+
+    #
+    # create new snapshot, freeze fs, flush and lock dbs if requested
+    #
+
+    mysql_credentials = None
+    mongo_credentials = None
+
+    if args.mysql:
+        if args.mysql_credentials:
+            with open(args.mysql_credentials) as data:
+                mysql_credentials = json.load(data)
+        mysql_args = []
+        mysql_args.append('mysql')
+        if mysql_credentials:
+            mysql_args.append('--user={}'.format(mysql_credentials['username']))
+            mysql_args.append('--password={}'.format(mysql_credentials['password']))
+        mysql_args.append('--execute')
+        mysql_args.append('FLUSH TABLES WITH READ LOCK')
+        call(mysql_args)
+
+    if args.mongo:
+        if args.mongo_credentials:
+            with open(args.mongo_credentials) as data:
+                mongo_credentials = json.load(data)
+        mongo_args = []
+        mongo_args.append('mongo')
+        if mongo_credentials:
+            mongo_args.append('--user={}'.format(mongo_credentials['username']))
+            mongo_args.append('--password={}'.format(mongo_credentials['password']))
+        mongo_args.append('--execute')
+        mongo_args.append('FLUSH TABLES WITH READ LOCK')
+        call(mongo_args)
+
+    # freeze mounts
+    for mount in args.mounts:
+        call(['fsfreeze', '-f', mount])
+
+    for volume_id in args.volume_ids:
+        snapshot = ec2.create_snapshot(VolumeId=volume_id, Description='Backup of {}'.format(volume_id))
+        new_snapshots.append(snapshot)
+
+    # unfreeze mounts
+    for mount in reversed(args.mounts):
+        call(['fsfreeze', '-u', mount])
+
+    #
+    # unlock databases
+    #
+
+    if args.mysql:
+        mysql_args = []
+        mysql_args.append('mysql')
+        if mysql_credentials:
+            mysql_args.append('--user={}'.format(mysql_credentials['username']))
+            mysql_args.append('--password={}'.format(mysql_credentials['password']))
+        mysql_args.append('--execute')
+        mysql_args.append('UNLOCK TABLES')
+        call(mysql_args)
+
+    if args.mongo:
+        mongo_args = []
+        mongo_args.append('mongo')
+        if mongo_credentials:
+            mongo_args.append('--user={}'.format(mongo_credentials['username']))
+            mongo_args.append('--password={}'.format(mongo_credentials['password']))
+        mongo_args.append('--execute')
+        mongo_args.append('UNLOCK TABLES')
+        call(mongo_args)
+
+    # add tags to snapshot and wait for it to complete
+    for snapshot in new_snapshots:
+        print('Created snapshot {}'.format(snapshot.snapshot_id))
+        snapshot.create_tags(Tags=tags)
+
+    for snapshot in new_snapshots:
+        snapshot.wait_until_completed()
+
+    #
+    # prune older snapshots using keep command line argument
+    #
+
+    filters = []
+    filters.append({ 'Name': 'volume-id', 'Values': [ volume_id ] })
+    filters.append({ 'Name': 'status', 'Values': [ 'completed' ] })
+    for tag in tags:
+        if tag['Key'] != 'Backup-UUID':
+            filters.append({ 'Name': 'tag:' + tag['Key'], 'Values': [ tag['Value'] ] })
+
+    # get list of existing snapshots
+    snapshots = list(ec2.snapshots.filter(OwnerIds=['self'], Filters=filters, MaxResults=1000))    
+
+    # calculate the number of snapshots to prune
+    num_to_prune = len(snapshots) - args.keep
+    if num_to_prune < 0:
+        num_to_prune = 0
+
+    print('Pruning {:d} of {:d} snapshots'.format(num_to_prune, len(snapshots)))
+
+    if num_to_prune > 0:
+        sorted_snapshots = sorted(snapshots, key=lambda snap: snap.start_time)
+        for i in range(num_to_prune):
+            print('Pruning snapshot {}'.format(sorted_snapshots[i].snapshot_id))
+            sorted_snapshots[i].delete()
+
+if __name__ == "__main__":
+    main(parser.parse_args())
