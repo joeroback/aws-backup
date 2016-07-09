@@ -40,9 +40,17 @@ EOF
 Invoking Manually
 -----------------
 ```
-aws_backup -volume-ids <VOLUME_ID1> <VOLUME_ID2> --mounts / /var/log --tags Frequency=Daily --mysql --mysql-credentials ~/.aws_mysql.json --keep 4
+aws_backup \
+    -volume-ids <VOLUME_ID1> <VOLUME_ID2> \
+    --mounts / /var/log \
+    --keep 4 \
+    --tags Frequency=Daily \
+    --mysql \
+    --mysql-credentials ~/.aws_mysql.json
 ```
 This will backup two volumes: `VOLUME_ID1` and `VOLUME_ID2`. It will also freeze mount points `/` and `/var/log` and flush and lock the mysql tables when creating the snapshot. It will retain up to 4 snapshots sorted by date.
+
+Tags is technically any arbitrary tags supported by EC2, but it is logical to use something related to the frequency of backup.
 
 Cron Setup
 ----------
