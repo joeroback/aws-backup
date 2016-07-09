@@ -25,6 +25,7 @@ import sys
 import uuid
 
 from subprocess import call
+from time import sleep
 
 # globals
 ec2 = boto3.resource('ec2')
@@ -94,6 +95,7 @@ def main(args):
 
     for volume_id in args.volume_ids:
         snapshot = ec2.create_snapshot(VolumeId=volume_id, Description='Backup of {}'.format(volume_id))
+        sleep(2.0)
         new_snapshots.append(snapshot)
 
     # unfreeze mounts
