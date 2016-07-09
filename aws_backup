@@ -20,7 +20,6 @@ import argparse
 import boto3
 import datetime
 import json
-import pprint
 import sys
 import uuid
 
@@ -29,7 +28,6 @@ from subprocess import call
 # globals
 ec2 = boto3.resource('ec2')
 parser = argparse.ArgumentParser()
-pp = pprint.PrettyPrinter(indent=2, width=200)
 
 # EBS volume ids to operate on
 parser.add_argument('--volume-ids', required=True, nargs='+', dest='volume_ids', help='EBS Volume ID to snapshot')
@@ -132,7 +130,6 @@ def main(args):
 
     # add tags to snapshot and wait for it to complete
     for snapshot in new_snapshots:
-        print('Created snapshot {}'.format(snapshot.snapshot_id))
         snapshot.create_tags(Tags=tags)
 
     for snapshot in new_snapshots:
@@ -158,12 +155,9 @@ def main(args):
         if num_to_prune < 0:
             num_to_prune = 0
 
-        print('Pruning {:d} of {:d} snapshots'.format(num_to_prune, len(snapshots)))
-
         if num_to_prune > 0:
             sorted_snapshots = sorted(snapshots, key=lambda snap: snap.start_time)
             for i in range(num_to_prune):
-                print('Pruning snapshot {}'.format(sorted_snapshots[i].snapshot_id))
                 sorted_snapshots[i].delete()
 
 if __name__ == "__main__":
