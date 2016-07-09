@@ -139,31 +139,32 @@ def main(args):
         snapshot.wait_until_completed()
 
     #
-    # prune older snapshots using keep command line argument
+    # prune older snapshots using --keep command line argument
     #
 
-    filters = []
-    filters.append({ 'Name': 'volume-id', 'Values': [ volume_id ] })
-    filters.append({ 'Name': 'status', 'Values': [ 'completed' ] })
-    for tag in tags:
-        if tag['Key'] != 'Backup-UUID':
-            filters.append({ 'Name': 'tag:' + tag['Key'], 'Values': [ tag['Value'] ] })
+    for volume_id in args.volume_ids:
+        filters = []
+        filters.append({ 'Name': 'volume-id', 'Values': [ volume_id ] })
+        filters.append({ 'Name': 'status', 'Values': [ 'completed' ] })
+        for tag in tags:
+            if tag['Key'] != 'Backup-UUID':
+                filters.append({ 'Name': 'tag:' + tag['Key'], 'Values': [ tag['Value'] ] })
 
-    # get list of existing snapshots
-    snapshots = list(ec2.snapshots.filter(OwnerIds=['self'], Filters=filters, MaxResults=1000))    
+        # get list of existing snapshots
+        snapshots = list(ec2.snapshots.filter(OwnerIds=['self'], Filters=filters, MaxResults=1000))
 
-    # calculate the number of snapshots to prune
-    num_to_prune = len(snapshots) - args.keep
-    if num_to_prune < 0:
-        num_to_prune = 0
+        # calculate the number of snapshots to prune
+        num_to_prune = len(snapshots) - args.keep
+        if num_to_prune < 0:
+            num_to_prune = 0
 
-    print('Pruning {:d} of {:d} snapshots'.format(num_to_prune, len(snapshots)))
+        print('Pruning {:d} of {:d} snapshots'.format(num_to_prune, len(snapshots)))
 
-    if num_to_prune > 0:
-        sorted_snapshots = sorted(snapshots, key=lambda snap: snap.start_time)
-        for i in range(num_to_prune):
-            print('Pruning snapshot {}'.format(sorted_snapshots[i].snapshot_id))
-            sorted_snapshots[i].delete()
+        if num_to_prune > 0:
+            sorted_snapshots = sorted(snapshots, key=lambda snap: snap.start_time)
+            for i in range(num_to_prune):
+                print('Pruning snapshot {}'.format(sorted_snapshots[i].snapshot_id))
+                sorted_snapshots[i].delete()
 
 if __name__ == "__main__":
     main(parser.parse_args())
