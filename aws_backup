@@ -82,10 +82,10 @@ def main(args):
         mongo_args = []
         mongo_args.append('mongo')
         if mongo_credentials:
-            mongo_args.append('--user={}'.format(mongo_credentials['username']))
+            mongo_args.append('--username={}'.format(mongo_credentials['username']))
             mongo_args.append('--password={}'.format(mongo_credentials['password']))
-        mongo_args.append('--execute')
-        mongo_args.append('FLUSH TABLES WITH READ LOCK')
+        mongo_args.append('admin')
+        mongo_args.append('--eval=\'printjson(db.runCommand({fsync:1,lock:1}))\'')
         call(mongo_args)
 
     # freeze mounts
@@ -118,10 +118,10 @@ def main(args):
         mongo_args = []
         mongo_args.append('mongo')
         if mongo_credentials:
-            mongo_args.append('--user={}'.format(mongo_credentials['username']))
+            mongo_args.append('--username={}'.format(mongo_credentials['username']))
             mongo_args.append('--password={}'.format(mongo_credentials['password']))
-        mongo_args.append('--execute')
-        mongo_args.append('UNLOCK TABLES')
+        mongo_args.append('admin')
+        mongo_args.append('--eval=\'printjson(db.$cmd.sys.unlock.findOne())\'')
         call(mongo_args)
 
     # add tags to snapshot and wait for it to complete
