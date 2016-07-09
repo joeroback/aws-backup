@@ -39,6 +39,11 @@ EOF
 
 Invoking Manually
 -----------------
+If using pyenv, first
+```
+pyenv shell 3.4.5
+```
+Now that the python environment is setup, just invoke the script.
 ```
 aws_backup \
     -volume-ids <VOLUME_ID1> <VOLUME_ID2> \
