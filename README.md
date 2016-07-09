@@ -46,7 +46,7 @@ pyenv shell 3.4.5
 Now that the python environment is setup, just invoke the script.
 ```
 aws_backup \
-    -volume-ids <VOLUME_ID1> <VOLUME_ID2> \
+    --volume-ids <VOLUME_ID1> <VOLUME_ID2> \
     --mounts / /var/log \
     --keep 4 \
     --tags Frequency=Daily \
@@ -56,6 +56,8 @@ aws_backup \
 This will backup two volumes: `VOLUME_ID1` and `VOLUME_ID2`. It will also freeze mount points `/` and `/var/log` and flush and lock the mysql tables when creating the snapshot. It will retain up to 4 snapshots sorted by date.
 
 Tags is technically any arbitrary tags supported by EC2, but it is logical to use something related to the frequency of backup.
+
+If you don't want to use `fsfreeze` or are using a filesystem that does not support `fsfreeze`, just do not specify it was a mount with `--mounts`.
 
 Cron Setup
 ----------
