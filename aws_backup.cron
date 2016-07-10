@@ -1,7 +1,7 @@
-# ensure PATH is setup for pyenv, set python version, need /sbin in PATH for fsfreeze
-# see https://github.com/yyuu/pyenv/wiki/Deploying-with-pyenv
+# ensure PATH is setup for pyenv, see https://github.com/yyuu/pyenv/wiki/Deploying-with-pyenv
+# need /sbin in PATH for fsfreeze
 PATH=/root/.pyenv/shims:/root/.pyenv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 PYENV_VERSION=3.4.5
-15 3 1 * * root /root/aws-backup/aws_backup --volume-ids vol-XXXXXXXX --mounts / --tags frequency=monthly --keep 1 --mysql --mysql-credentials ~/.aws_mysql.json
-30 3 * * 0 root /root/aws-backup/aws_backup --volume-ids vol-XXXXXXXX --mounts / --tags frequency=weekly --keep 1 --mysql --mysql-credentials ~/.aws_mysql.json
-45 3 * * * root /root/aws-backup/aws_backup --volume-ids vol-XXXXXXXX --mounts / --tags frequency=daily --keep 6 --mysql --mysql-credentials ~/.aws_mysql.json
+15 3 1 * * root /root/aws-backup/aws_backup --volume-ids vol-XXXXXXXX --mounts / --keep 1 --mysql --mysql-credentials ~/.aws_mysql.json --tags frequency=monthly
+30 3 * * 1 root /root/aws-backup/aws_backup --volume-ids vol-XXXXXXXX --mounts / --keep 1 --mysql --mysql-credentials ~/.aws_mysql.json --tags frequency=weekly
+45 3 * * * root /root/aws-backup/aws_backup --volume-ids vol-XXXXXXXX --mounts / --keep 6 --mysql --mysql-credentials ~/.aws_mysql.json --tags frequency=daily
