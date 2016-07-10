@@ -102,6 +102,7 @@ def main(args):
                 mongo_credentials = json.load(data)
         mongo_args = []
         mongo_args.append('mongo')
+        mongo_args.append('--quiet')
         if mongo_credentials:
             mongo_args.append('--username')
             mongo_args.append(mongo_credentials['username'])
@@ -146,6 +147,7 @@ def main(args):
     if args.mongo:
         mongo_args = []
         mongo_args.append('mongo')
+        mongo_args.append('--quiet')
         if mongo_credentials:
             mongo_args.append('--username')
             mongo_args.append(mongo_credentials['username'])
