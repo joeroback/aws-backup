@@ -23,7 +23,7 @@ import json
 import sys
 import uuid
 
-from subprocess import call
+from subprocess import call, DEVNULL
 
 #
 # logging to syslog
@@ -94,7 +94,7 @@ def main(args):
         mysql_args.append('--execute')
         mysql_args.append('FLUSH TABLES WITH READ LOCK')
         log.info('flushing mysql tables with read lock')
-        call(mysql_args)
+        call(mysql_args, stdout=DEVNULL, stderr=DEVNULL)
 
     if args.mongo:
         if args.mongo_credentials:
@@ -112,7 +112,7 @@ def main(args):
         mongo_args.append('--eval')
         mongo_args.append('printjson(db.runCommand({fsync:1,lock:1}))')
         log.info('syncing mongodb with lock')
-        call(mongo_args)
+        call(mongo_args, stdout=DEVNULL, stderr=DEVNULL)
 
     # freeze mounts
     for mount in args.mounts:
@@ -142,7 +142,7 @@ def main(args):
         mysql_args.append('--execute')
         mysql_args.append('UNLOCK TABLES')
         log.info('unlocking mysql tables')
-        call(mysql_args)
+        call(mysql_args, stdout=DEVNULL, stderr=DEVNULL)
 
     if args.mongo:
         mongo_args = []
@@ -157,7 +157,7 @@ def main(args):
         mongo_args.append('--eval')
         mongo_args.append('printjson(db.$cmd.sys.unlock.findOne())')
         log.info('unlocking mongodb')
-        call(mongo_args)
+        call(mongo_args, stdout=DEVNULL, stderr=DEVNULL)
 
     # add tags to snapshot and wait for it to complete
     for snapshot in new_snapshots:
