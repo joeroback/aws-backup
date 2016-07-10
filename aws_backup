@@ -25,9 +25,31 @@ import uuid
 
 from subprocess import call
 
+#
+# logging to syslog
+#
+
+import logging
+import logging.handlers
+
+formatter = logging.Formatter('%(module)s: %(message)s')
+
+handler = logging.handlers.SysLogHandler(address = '/dev/log')
+handler.setFormatter(formatter)
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
+log.addHandler(handler)
+
+#
 # globals
+#
 ec2 = boto3.resource('ec2')
 parser = argparse.ArgumentParser()
+
+#
+# program arguments
+#
 
 # EBS volume ids to operate on
 parser.add_argument('--volume-ids', required=True, nargs='+', dest='volume_ids', help='EBS Volume ID to snapshot')
@@ -71,6 +93,7 @@ def main(args):
             mysql_args.append('--password={}'.format(mysql_credentials['password']))
         mysql_args.append('--execute')
         mysql_args.append('FLUSH TABLES WITH READ LOCK')
+        log.info('flushing mysql tables with read lock')
         call(mysql_args)
 
     if args.mongo:
@@ -87,18 +110,22 @@ def main(args):
         mongo_args.append('admin')
         mongo_args.append('--eval')
         mongo_args.append('printjson(db.runCommand({fsync:1,lock:1}))')
+        log.info('syncing mongodb with lock')
         call(mongo_args)
 
     # freeze mounts
     for mount in args.mounts:
+        log.info('freezing ' + mount)
         call(['fsfreeze', '-f', mount])
 
     for volume_id in args.volume_ids:
+        log.info('creating snapshot of ' + volume_id)
         snapshot = ec2.create_snapshot(VolumeId=volume_id, Description='Backup of {}'.format(volume_id))
         new_snapshots.append(snapshot)
 
     # unfreeze mounts
     for mount in reversed(args.mounts):
+        log.info('unfreezing ' + mount)
         call(['fsfreeze', '-u', mount])
 
     #
@@ -113,6 +140,7 @@ def main(args):
             mysql_args.append('--password={}'.format(mysql_credentials['password']))
         mysql_args.append('--execute')
         mysql_args.append('UNLOCK TABLES')
+        log.info('unlocking mysql tables')
         call(mysql_args)
 
     if args.mongo:
@@ -126,6 +154,7 @@ def main(args):
         mongo_args.append('admin')
         mongo_args.append('--eval')
         mongo_args.append('printjson(db.$cmd.sys.unlock.findOne())')
+        log.info('unlocking mongodb')
         call(mongo_args)
 
     # add tags to snapshot and wait for it to complete
@@ -133,6 +162,7 @@ def main(args):
         snapshot.create_tags(Tags=tags)
 
     for snapshot in new_snapshots:
+        log.info('waiting for snapshot ' + snapshot.snapshot_id)
         snapshot.wait_until_completed()
 
     #
@@ -152,13 +182,15 @@ def main(args):
 
         # calculate the number of snapshots to prune
         num_to_prune = len(snapshots) - args.keep
-        if num_to_prune < 0:
-            num_to_prune = 0
 
         if num_to_prune > 0:
             sorted_snapshots = sorted(snapshots, key=lambda snap: snap.start_time)
             for i in range(num_to_prune):
+                log.info('prunning snapshot ' + sorted_snapshots[i].snapshot_id)
                 sorted_snapshots[i].delete()
 
 if __name__ == "__main__":
-    main(parser.parse_args())
+    args = parser.parse_args()
+    log.info('starting backups for volumes ' + ', '.join(args.volume_ids))
+    main(args)
+    log.info('completed backups for volumes ' + ', '.join(args.volume_ids))
