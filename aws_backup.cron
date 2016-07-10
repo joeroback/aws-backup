@@ -1,4 +1,6 @@
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# ensure PATH is setup for pyenv, set python version, need /sbin in PATH for fsfreeze
+# see https://github.com/yyuu/pyenv/wiki/Deploying-with-pyenv
+PATH=/root/.pyenv/shims:/root/.pyenv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 PYENV_VERSION=3.4.5
 15 3 1 * * root /root/aws-backup/aws_backup --volume-ids vol-XXXXXXXX --mounts / --tags frequency=monthly --keep 1 --mysql --mysql-credentials ~/.aws_mysql.json
 30 3 * * 0 root /root/aws-backup/aws_backup --volume-ids vol-XXXXXXXX --mounts / --tags frequency=weekly --keep 1 --mysql --mysql-credentials ~/.aws_mysql.json
